@@ -56,6 +56,7 @@ func (r *runtime) openPackageCapabilities(pkg string, spec *harness.Request) (fu
 		if err != nil {
 			return nil, err
 		}
+		spec.ReadOnlyPaths = append(spec.ReadOnlyPaths, skills)
 		if err = unpackSkills(&z.Reader, skills, doc.Skills, spec); err != nil {
 			cleanup()
 			return nil, err

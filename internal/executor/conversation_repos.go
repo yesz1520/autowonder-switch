@@ -104,6 +104,7 @@ func (r *runtime) openConversationRepos(ctx context.Context, pkg, dir string, sp
 		spec.Instructions += fmt.Sprintf("\nRepository %q is checked out at %q.", repo.Name, path)
 	}
 	spec.Readable = true
+	spec.ReadOnlyPaths = append(spec.ReadOnlyPaths, base)
 	spec.Instructions += "\nUse executor.open_repository with the bound name to locate or check out a repository for this turn."
 	platform := spec.Platform
 	spec.Platform = func(ctx context.Context, name string, args map[string]any) (string, error) {

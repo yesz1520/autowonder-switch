@@ -148,6 +148,9 @@ func (r *runtime) execute(j *job, q *aw.TaskDispatch, dir string, result *aw.Tas
 		return err
 	}
 	spec := harness.Request{MemoryMode: r.launch.MemoryMode, Platform: r.platform(q.DispatchMCPToken), Environment: q.EnvironmentVariables, Directory: workspace, Writable: len(repos) > 0}
+	for _, repo := range repos {
+		spec.ReadOnlyPaths = append(spec.ReadOnlyPaths, repo.gitDir)
+	}
 	spec.Prompt, err = packageText(file, true, &spec)
 	if err != nil {
 		return err
