@@ -265,9 +265,9 @@ func (r *runtime) snapshot() aw.Heartbeat {
 			aw.FeatureConversationAcpInteractionV1, aw.FeatureConversationAnswerDeliveryV1, aw.FeatureConversationTurnCancel, aw.FeatureConversationDeliveryAckV1, aw.FeatureConversationTurnEvent,
 		},
 	}
-	if r.provider() == "claude" {
+	if r.provider() == "claude" || r.provider() == "pi" {
 		h.ProtocolFeatures = slices.DeleteFunc(h.ProtocolFeatures, func(f aw.Feature) bool {
-			return f == aw.FeatureTerminalSteerV1 || f == aw.FeatureConversationAnswerDeliveryV1
+			return (f == aw.FeatureTerminalSteerV1 && r.provider() == "claude") || f == aw.FeatureConversationAnswerDeliveryV1
 		})
 	}
 	if r.files.RestartEnabled {

@@ -22,6 +22,7 @@ import (
 )
 
 const CodexHarness = "codex"
+const PiHarness = "pi"
 const ClaudeHarness = "claude"
 
 type Profile struct {
@@ -53,7 +54,7 @@ func (p *Profile) validate() error {
 	if p.Harness == "" {
 		p.Harness = CodexHarness
 	}
-	if p.Harness != CodexHarness && p.Harness != ClaudeHarness {
+	if p.Harness != CodexHarness && p.Harness != ClaudeHarness && p.Harness != PiHarness {
 		return errors.New("不支持的本机 harness")
 	}
 	p.Hostname = strings.TrimSpace(p.Hostname)

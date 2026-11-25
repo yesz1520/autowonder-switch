@@ -23,6 +23,7 @@ import (
 	"github.com/yesz1520/autowonder-switch/internal/harness"
 	"github.com/yesz1520/autowonder-switch/internal/harness/claude"
 	"github.com/yesz1520/autowonder-switch/internal/harness/codex"
+	"github.com/yesz1520/autowonder-switch/internal/harness/pi"
 )
 
 type stub struct{ calls atomic.Int32 }
@@ -95,9 +96,16 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 	reader := &completedTurn{}
 	savedID := aw.NewResultID()
 	useClaude := !recovery && os.Getenv("AUTOWONDER_TEST_CLAUDE") == "1"
+	usePi := !recovery && os.Getenv("AUTOWONDER_TEST_PI") == "1"
+	provider := "codex"
 	if recovery {
 		backend = reader
+	} else if usePi {
+		piFixture(t)
+		backend = pi.Backend{}
+		provider = "pi"
 	} else if useClaude {
+		provider = "claude"
 		claudeFixture(t)
 		backend = claude.Backend{}
 	} else if os.Getenv("AUTOWONDER_TEST_CODEX") == "1" {
@@ -125,8 +133,8 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 			t.Error("missing usage")
 			return
 		}
-		if useClaude && (req.Usage[0].Provider != "claude" || req.Usage[0].InputTokens == nil || *req.Usage[0].InputTokens < 1) {
-			t.Error("incorrect Claude usage")
+		if (useClaude || usePi) && (req.Usage[0].Provider != provider || req.Usage[0].InputTokens == nil || *req.Usage[0].InputTokens < 1) {
+			t.Error("incorrect harness usage")
 		}
 		usageCalls.Add(1)
 		w.WriteHeader(204)
@@ -146,7 +154,7 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		fmt.Fprint(w, `{"files":[{"index":0,"status":"ACCEPTED"}]}`)
 	})
 	mux.HandleFunc("/api/daemon/dispatches/1/checkpoint", func(w http.ResponseWriter, r *http.Request) {
-		if useClaude && r.FormValue("provider") != "claude" {
+		if (useClaude || usePi) && r.FormValue("provider") != provider {
 			t.Error("incorrect checkpoint provider")
 		}
 		f, _, err := r.FormFile("checkpoint")
@@ -214,10 +222,6 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		}
 	}
 	h := read("HEARTBEAT")
-	provider := "codex"
-	if useClaude {
-		provider = "claude"
-	}
 	if !bytes.Contains(h, []byte("aws-"+provider+"-")) {
 		t.Fatal(string(h))
 	}
@@ -256,7 +260,7 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		t.Fatal("duplicate execution")
 	}
 	send(map[string]any{"type": "TASK_RESULT_ACK", "dispatchId": 1, "resultId": result.ResultID, "resultProtocolVersion": 2, "accepted": true, "disposition": "ACCEPTED"})
-	if useClaude {
+	if useClaude || usePi {
 		if usageCalls.Load() != 1 {
 			t.Fatal("expected one usage report")
 		}

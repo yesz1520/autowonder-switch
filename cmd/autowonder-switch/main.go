@@ -23,6 +23,7 @@ import (
 	"github.com/yesz1520/autowonder-switch/internal/harness"
 	"github.com/yesz1520/autowonder-switch/internal/harness/claude"
 	"github.com/yesz1520/autowonder-switch/internal/harness/codex"
+	"github.com/yesz1520/autowonder-switch/internal/harness/pi"
 )
 
 func main() {
@@ -32,8 +33,9 @@ func main() {
 	cap := flag.Int("capacity", 1, "maximum concurrent tasks and conversation turns")
 	state := flag.String("state-dir", "", "persistent executor state directory")
 	binary := flag.String("codex", "codex", "Codex executable")
+	piBinary := flag.String("pi", "pi", "pi executable")
 	claudeBinary := flag.String("claude", "", "Claude Code executable (default: local installation)")
-	provider := flag.String("harness", "codex", "single-executor harness: codex or claude")
+	provider := flag.String("harness", "codex", "single-executor harness: codex, claude or pi")
 	models := flag.Bool("list-models", false, "print selectable harness models and exit")
 	repos := map[string]string{}
 	flag.Func("repo", "repo name=absolute local path (repeatable)", func(s string) error {
@@ -68,7 +70,7 @@ func main() {
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	backends := map[string]harness.Backend{daemon.CodexHarness: codex.Backend{Binary: *binary}, daemon.ClaudeHarness: claude.Backend{Binary: *claudeBinary}}
+	backends := map[string]harness.Backend{daemon.PiHarness: pi.Backend{Binary: *piBinary}, daemon.CodexHarness: codex.Backend{Binary: *binary}, daemon.ClaudeHarness: claude.Backend{Binary: *claudeBinary}}
 	backend, ok := backends[*provider]
 	if !ok {
 		log.Fatal("unknown harness")

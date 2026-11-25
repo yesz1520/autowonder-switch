@@ -17,6 +17,7 @@ type Answer struct {
 type Ask func(context.Context, string, map[string]any) (Answer, error)
 type Request struct {
 	ReadOnlyPaths                                   []string // Executor-owned repository metadata, conversation checkouts and packaged skills.
+	SessionDirectory                                string   // Per-identity native session storage for backends that support it.
 	MemoryMode                                      string
 	PluginIDs                                       []string
 	ToolHookCommands                                map[string]string

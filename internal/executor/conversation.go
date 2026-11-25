@@ -78,7 +78,7 @@ func (r *runtime) turn(ctx context.Context, s *aw.Session, q *aw.ConversationTur
 	return nil
 }
 func (r *runtime) converse(j *job, q *aw.ConversationTurn, dir, workspace string) (harness.Reply, error) {
-	spec := harness.Request{MemoryMode: r.launch.MemoryMode, Platform: r.platform(q.MCPToken), Environment: q.EnvironmentVariables, Directory: workspace, Prompt: q.Content, Instructions: q.SystemPrompt}
+	spec := harness.Request{SessionDirectory: filepath.Join(r.dir, "sessions"), MemoryMode: r.launch.MemoryMode, Platform: r.platform(q.MCPToken), Environment: q.EnvironmentVariables, Directory: workspace, Prompt: q.Content, Instructions: q.SystemPrompt}
 	var reply harness.Reply
 	sessionFile := filepath.Join(dir, "session")
 	b, err := os.ReadFile(sessionFile)
