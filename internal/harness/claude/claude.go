@@ -19,9 +19,10 @@ import (
 	"time"
 
 	"github.com/yesz1520/autowonder-switch/internal/harness"
+	"github.com/yesz1520/autowonder-switch/internal/harness/toolbridge"
 )
 
-type Backend struct{ Binary, SandboxBinary string }
+type Backend struct{ Binary string }
 
 func (Backend) Provider() string { return "claude" }
 func (b Backend) command(ctx context.Context, args ...string) *exec.Cmd {
@@ -55,12 +56,12 @@ func (b Backend) Version(ctx context.Context) (string, error) {
 	return f[0], nil
 }
 
-var streamArgs = []string{"-p", "--verbose", "--input-format", "stream-json", "--output-format", "stream-json", "--tools", "", "--strict-mcp-config", "--setting-sources", "user"}
+var streamArgs = []string{"-p", "--verbose", "--input-format", "stream-json", "--output-format", "stream-json", "--strict-mcp-config", "--setting-sources", "user"}
 
 func (b Backend) Models(ctx context.Context) (harness.Catalog, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	cmd := b.command(ctx, streamArgs...)
+	cmd := b.command(ctx, append(append([]string{}, streamArgs...), "--tools", "")...)
 	cmd.Dir = os.TempDir()
 	in, err := cmd.StdinPipe()
 	if err != nil {
@@ -141,6 +142,12 @@ func userMessage(q harness.Request) ([]byte, error) {
 	return json.Marshal(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": content}})
 }
 
+var shellVariable = regexp.MustCompile(`^[A-Za-z_][A-Za-z_0-9]*$`)
+
+func shellLiteral(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+
 var apiStatus = regexp.MustCompile(`(?i)API Error:\s*([45][0-9]{2})\b`)
 
 func (b Backend) Run(ctx context.Context, q harness.Request, h harness.Hooks) (harness.Reply, error) {
@@ -160,18 +167,50 @@ func (b Backend) Run(ctx context.Context, q harness.Request, h harness.Hooks) (h
 	if q.Instructions != "" {
 		args = append(args, "--append-system-prompt", q.Instructions)
 	}
-	if len(q.ToolHookCommands) > 0 {
-		hooks := map[string]any{}
-		for _, event := range []string{"PreToolUse", "PostToolUse"} {
-			if command := q.ToolHookCommands[event]; command != "" {
-				hooks[event] = []any{map[string]any{"matcher": "*", "hooks": []any{map[string]any{"type": "command", "command": command, "timeout": 86400}}}}
+	nativeTools := ""
+	if q.Readable || q.Writable {
+		nativeTools = "Read,Glob,Grep"
+	}
+	settings := map[string]any{}
+	hooks := map[string]any{}
+	if q.Writable {
+		nativeTools += ",Bash"
+		settings["sandbox"] = map[string]any{"enabled": true, "failIfUnavailable": true, "allowUnsandboxedCommands": false}
+		if len(q.Environment) > 0 {
+			dir, err := os.MkdirTemp("", "autowonder-claude-env-")
+			if err != nil {
+				return reply, err
 			}
+			defer os.RemoveAll(dir)
+			var exports strings.Builder
+			for name, value := range q.Environment {
+				if !shellVariable.MatchString(name) || strings.ContainsRune(value, 0) {
+					return reply, errors.New("invalid Claude workspace environment variable")
+				}
+				fmt.Fprintf(&exports, "export %s=%s\n", name, shellLiteral(value))
+			}
+			path := filepath.Join(dir, "workspace.env")
+			if err := os.WriteFile(path, []byte(exports.String()), 0600); err != nil {
+				return reply, err
+			}
+			hooks["SessionStart"] = []any{map[string]any{"hooks": []any{map[string]string{"type": "command", "command": "cat " + shellLiteral(path) + ` >> "$CLAUDE_ENV_FILE"`}}}}
 		}
-		settings, err := json.Marshal(map[string]any{"hooks": hooks})
+	}
+	args = append(args, "--tools", nativeTools)
+	for _, event := range []string{"PreToolUse", "PostToolUse"} {
+		if command := q.ToolHookCommands[event]; command != "" {
+			hooks[event] = []any{map[string]any{"matcher": "*", "hooks": []any{map[string]any{"type": "command", "command": command, "timeout": 86400}}}}
+		}
+	}
+	if len(hooks) > 0 {
+		settings["hooks"] = hooks
+	}
+	if len(settings) > 0 {
+		data, err := json.Marshal(settings)
 		if err != nil {
 			return reply, err
 		}
-		args = append(args, "--settings", string(settings))
+		args = append(args, "--settings", string(data))
 	}
 	if q.OutputSchema != nil {
 		schema, err := json.Marshal(q.OutputSchema)
@@ -180,13 +219,17 @@ func (b Backend) Run(ctx context.Context, q harness.Request, h harness.Hooks) (h
 		}
 		args = append(args, "--json-schema", string(schema))
 	}
-	bridge, closeBridge, err := openBridge(ctx, q, b.SandboxBinary)
+	bridge, closeBridge, err := toolbridge.Open(ctx, harness.Request{Platform: q.Platform, Ask: q.Ask})
 	if err != nil {
 		return reply, err
 	}
 	defer closeBridge()
 	if bridge != "" {
-		args = append(args, "--mcp-config", bridge, "--allowedTools", "mcp__switch__*")
+		cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{"switch": map[string]string{"type": "http", "url": bridge}}})
+		if err != nil {
+			return reply, err
+		}
+		args = append(args, "--mcp-config", string(cfg), "--allowedTools", "mcp__switch__*")
 	}
 	cmd := b.command(ctx, args...)
 	cmd.Dir = q.Directory

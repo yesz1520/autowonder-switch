@@ -39,12 +39,15 @@ func claudeFixture(t *testing.T) {
 		if !strings.Contains(text, "tool_result") {
 			for _, v := range req.Tools {
 				switch {
-				case strings.Contains(text, "Request a handoff") && v.Name == "mcp__switch__platform":
+				case strings.Contains(text, "Request a handoff") && (v.Name == "mcp__switch__platform" || v.Name == "switch_platform"):
 					tool = v.Name
 					input = `{"operation":"call","name":"executor.request_handoff","arguments":{"to":"reviewer","toType":"AGENT"}}`
-				case strings.Contains(text, "workspace-test") && v.Name == "mcp__switch__workspace":
+				case strings.Contains(text, "workspace-test") && v.Name == "switch_workspace":
 					tool = v.Name
 					input = `{"args":["sh","-c","echo verified > artifact.txt"]}`
+				case strings.Contains(text, "workspace-test") && v.Name == "Bash":
+					tool = v.Name
+					input = `{"command":"echo \"$AW_TEST_VALUE\" > artifact.txt"}`
 				}
 			}
 		}
@@ -84,7 +87,7 @@ func claudeFixture(t *testing.T) {
 
 func TestClaudeNativeWorkspace(t *testing.T) {
 	if os.Getenv("AUTOWONDER_TEST_CLAUDE") != "1" {
-		t.Skip("requires installed Claude Code and sandbox CLI")
+		t.Skip("requires installed Claude Code")
 	}
 	claudeFixture(t)
 	dir := t.TempDir()
@@ -92,7 +95,7 @@ func TestClaudeNativeWorkspace(t *testing.T) {
 	defer cancel()
 	pre := filepath.Join(dir, "pre-ran")
 	post := filepath.Join(dir, "post-ran")
-	_, err := (claude.Backend{}).Run(ctx, harness.Request{Directory: dir, Writable: true, Prompt: "workspace-test", ToolHookCommands: map[string]string{"PreToolUse": "touch '" + pre + "'", "PostToolUse": "touch '" + post + "'"}}, harness.Hooks{})
+	_, err := (claude.Backend{}).Run(ctx, harness.Request{Directory: dir, Writable: true, Environment: map[string]string{"AW_TEST_VALUE": "verified"}, Prompt: "workspace-test", ToolHookCommands: map[string]string{"PreToolUse": "touch '" + pre + "'", "PostToolUse": "touch '" + post + "'"}}, harness.Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}

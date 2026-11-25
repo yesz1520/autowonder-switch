@@ -68,7 +68,7 @@ func main() {
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	backends := map[string]harness.Backend{daemon.CodexHarness: codex.Backend{Binary: *binary}, daemon.ClaudeHarness: claude.Backend{Binary: *claudeBinary, SandboxBinary: *binary}}
+	backends := map[string]harness.Backend{daemon.CodexHarness: codex.Backend{Binary: *binary}, daemon.ClaudeHarness: claude.Backend{Binary: *claudeBinary}}
 	backend, ok := backends[*provider]
 	if !ok {
 		log.Fatal("unknown harness")

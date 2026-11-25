@@ -1,4 +1,5 @@
-package claude
+// Package toolbridge serves the tools scoped to one local harness turn.
+package toolbridge
 
 import (
 	"context"
@@ -8,13 +9,12 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/yesz1520/autowonder-switch/internal/harness"
+	"github.com/yesz1520/autowonder-switch/internal/sandbox"
 )
 
 type platformInput struct {
@@ -36,7 +36,7 @@ func toolText(s string) *mcp.CallToolResult {
 
 // The turn owns the listener and capability URL. Only scoped tool calls cross
 // this boundary. The platform token stays in the Go executor.
-func openBridge(ctx context.Context, q harness.Request, sandboxBinary string) (string, func(), error) {
+func Open(ctx context.Context, q harness.Request) (string, func(), error) {
 	if q.Platform == nil && q.Ask == nil && !q.Readable && !q.Writable {
 		return "", func() {}, nil
 	}
@@ -83,34 +83,14 @@ func openBridge(ctx context.Context, q harness.Request, sandboxBinary string) (s
 		})
 	}
 	if q.Writable || q.Readable {
-		if sandboxBinary == "" {
-			sandboxBinary = "codex"
-		}
+		workspace := sandbox.Workspace{Directory: q.Directory, Writable: q.Writable, ReadOnlyPaths: q.ReadOnlyPaths}
 		mcp.AddTool(server, &mcp.Tool{Name: "workspace", Description: "Run a command in the executor workspace sandbox. Supply executable and arguments separately, e.g. [\"git\",\"status\"]."}, func(ctx context.Context, _ *mcp.CallToolRequest, in commandInput) (*mcp.CallToolResult, any, error) {
-			if len(in.Args) == 0 {
-				return nil, nil, errors.New("missing command")
-			}
-			mode := "read-only"
-			if q.Writable {
-				mode = "workspace-write"
-			}
-			args := []string{"sandbox", "-c", "sandbox_mode=\"" + mode + "\"", "-c", "sandbox_workspace_write.network_access=false", "--", "/usr/bin/env", "-i", "PATH=" + os.Getenv("PATH")}
-			for k, v := range q.Environment {
-				if k == "" || strings.ContainsAny(k, "=\x00") || strings.HasPrefix(k, "-") {
-					return nil, nil, errors.New("invalid environment key")
-				}
-				args = append(args, k+"="+v)
-			}
-			args = append(args, in.Args...)
-			cmd := exec.CommandContext(ctx, sandboxBinary, args...)
-			cmd.Dir = q.Directory
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME")}
 			out := &limitedText{}
-			cmd.Stdout = out
-			cmd.Stderr = out
-			err := cmd.Run()
+			err := workspace.Run(ctx, q.Environment, in.Args, out)
 			if err != nil {
-				return toolText(out.text.String() + "\n" + err.Error()), nil, nil
+				result := toolText(out.text.String() + "\n" + err.Error())
+				result.IsError = true
+				return result, nil, nil
 			}
 			return toolText(out.text.String()), nil, nil
 		})
@@ -126,8 +106,7 @@ func openBridge(ctx context.Context, q harness.Request, sandboxBinary string) (s
 	}
 	srv := &http.Server{Handler: mux, BaseContext: func(net.Listener) context.Context { return ctx }, ReadHeaderTimeout: 5 * time.Second}
 	go srv.Serve(ln)
-	cfg, err := json.Marshal(map[string]any{"mcpServers": map[string]any{"switch": map[string]string{"type": "http", "url": "http://" + ln.Addr().String() + path}}})
-	return string(cfg), func() { srv.Close() }, err
+	return "http://" + ln.Addr().String() + path, func() { srv.Close() }, nil
 }
 
 type limitedText struct{ text strings.Builder }

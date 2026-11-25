@@ -19,7 +19,9 @@ The daemon looks for `claude` on PATH, then tries `~/.local/bin/claude`. Use `-c
 
 Dispatches and conversations run in non-interactive mode. The executor provides turn-scoped MCP tools for platform operations and returns the response, session ID and usage. Later turns resume the conversation by session ID. Dispatch packages, result receipts and checkpoints use the executor protocol. Both platform memory and disabled memory turn off Claude's automatic memory.
 
-Workspace commands require the local Codex sandbox tool. Plain text conversations require only Claude Code. The executor does not advertise steering or reliable elicitation answer receipts. If the process exits before a result is saved, the executor cannot confirm completion of that turn from Claude's conversation history.
+Read-only tasks can inspect files with Claude Code’s Read, Glob and Grep tools. Writable tasks can also run commands and change files in Claude Code’s built-in Bash sandbox. A writable task fails if the sandbox is unavailable.
+
+The executor does not advertise steering or reliable elicitation answer receipts. If the process exits before a result is saved, the executor cannot confirm completion of that turn from Claude's conversation history.
 
 ## Integration tests
 
