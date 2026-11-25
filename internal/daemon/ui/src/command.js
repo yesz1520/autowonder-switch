@@ -10,7 +10,7 @@ export function readConnectCommand(input, normalizeURL) {
       throw Error("PowerShell 编码无效，请重新复制完整指令。");
     }
   }
-  const command = text.replace(/(?:\\|\x60)\r?\n/g, " ").match(/(?:^|;\s*)npx\s+(?:(?:-y|--yes)\s+)?@alicloud\/autowonder(?:@[\w.-]+)?\s+connect\s+([^;]+)$/i);
+  const command = text.replace(/(?:\\|\x60)\r?\n/g, " ").match(/(?:^|;\s*)npx\s+(?:(?:-y|--yes)\s+)?(?:@alicloud\/)?autowonder(?:@[\w.-]+)?\s+connect\s+([^;]+)$/i);
   if (!command) throw Error("请粘贴完整的 AutoWonder connect 启动指令。");
 
   const fields = {};
