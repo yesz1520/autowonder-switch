@@ -40,7 +40,7 @@ onMounted(() => {
   narrow.addEventListener("change", resizeNav);
 });
 onUnmounted(() => narrow.removeEventListener("change", resizeNav));
-const harnessOptions = [{ value: "codex", label: "Codex" }, {value: "claude", label: "Claude Code"}];
+const harnessOptions = [{ value: "codex", label: "Codex" }, {value: "claude", label: "Claude Code"}, {value:"pi",label:"pi"}];
 const memoryModes = { platform: "平台记忆", "provider-local": "本机 Agent 记忆", none: "关闭记忆" };
 const harnessLabel = (value) =>
   harnessOptions.find((option) => option.value === value)?.label ?? value;
