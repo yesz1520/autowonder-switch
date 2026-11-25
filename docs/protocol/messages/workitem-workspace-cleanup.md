@@ -4,7 +4,7 @@ English | [中文](workitem-workspace-cleanup.zh.md)
 
 Platform → executor. Frame type: `WORKITEM_WORKSPACE_CLEANUP`.
 
-Identify the workspace to clean with `executorId`, `tenantId`, `workitemId` and `workitemVersion`. The `publishedAt` timestamp is in Unix milliseconds.
+The platform requests cleanup for a closed work item on this executor. It uses `workitemVersion` to distinguish cleanup requests for different versions of the same work item.
 
 ## Message fields
 
@@ -15,7 +15,7 @@ Identify the workspace to clean with `executorId`, `tenantId`, `workitemId` and 
 | `tenantId` | Integer | Tenant that owns the work item. |
 | `workitemId` | Integer | ID of the work item. |
 | `workitemVersion` | Integer | Work item version to clean up. |
-| `publishedAt` | Integer | Publication time in milliseconds since the Unix epoch. |
+| `publishedAt` | Integer | Time of the last transition into the current terminal status, in Unix milliseconds. |
 
 ## Example frame
 

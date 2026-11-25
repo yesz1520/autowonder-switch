@@ -4,7 +4,7 @@
 
 平台 → 执行器。帧类型为 `WORKITEM_WORKSPACE_CLEANUP`。
 
-按 `executorId`、`tenantId`、`workitemId` 和 `workitemVersion` 定位要清理的工作区。时间字段 `publishedAt` 使用 Unix 毫秒。
+平台请求清理该执行器上已结束工单的工作区。同一工单不同版本的清理请求通过 `workitemVersion` 区分。
 
 ## 消息参数
 
@@ -15,7 +15,7 @@
 | `tenantId` | 整数 | 工单所属租户的 ID。 |
 | `workitemId` | 整数 | 派单所属工单的 ID。 |
 | `workitemVersion` | 整数 | 要清理的工单版本。 |
-| `publishedAt` | 整数 | 发布时间，Unix 毫秒时间戳。 |
+| `publishedAt` | 整数 | 工单最近一次进入当前终态的时间，Unix 毫秒时间戳。 |
 
 ## 消息示例
 

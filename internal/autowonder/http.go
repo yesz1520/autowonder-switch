@@ -18,6 +18,9 @@ import (
 	"strings"
 )
 
+// ErrPlatformTransport denotes an HTTP exchange with no usable response.
+var ErrPlatformTransport = errors.New("platform HTTP request failed")
+
 type HTTPError struct {
 	StatusCode int
 	Body       json.RawMessage
@@ -96,7 +99,7 @@ func (c *Client) request(ctx context.Context, method, path string, params url.Va
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, errors.New("platform HTTP request failed")
+		return nil, ErrPlatformTransport
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

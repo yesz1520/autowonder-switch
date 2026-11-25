@@ -4,7 +4,7 @@ English | [中文](action-plan-v1.zh.md)
 
 Heartbeat capability identifier: `ACTION_PLAN_V1`.
 
-Advertise support for plans with frozen parameters that require user confirmation before execution.
+The platform assistant lists the tools available to its conversation token. For writes that require confirmation, call `autowonder.propose_platform_actions` with 1 to 10 `{tool, arguments}` objects in `actions`. The platform freezes the arguments and returns the plan ID, hash and status. The executor reports the pending plan to the user. Once the conversation owner confirms in the platform UI, the server executes the frozen actions.
 
 ## Example declaration
 
