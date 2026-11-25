@@ -94,7 +94,7 @@ func (c *Client) request(ctx context.Context, method, path string, params url.Va
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
-	resp, err := c.http.Do(req)
+	resp, err := c.hook.DoHTTP(&c.http, req, path)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -262,7 +262,7 @@ func (c *Client) downloadVerified(ctx context.Context, link, digest, dest string
 	if err != nil || req.URL.User != nil || req.URL.Host == "" || (req.URL.Scheme != "http" && req.URL.Scheme != "https") {
 		return errors.New("invalid download URL")
 	}
-	resp, err := c.http.Do(req)
+	resp, err := c.hook.DoHTTP(&c.http, req, "signed download")
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

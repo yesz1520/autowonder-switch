@@ -245,7 +245,7 @@ func (c *Client) PutDebugLog(ctx context.Context, link DebugLogUploadLink, body 
 		return errors.New("invalid debug log upload URL")
 	}
 	req.ContentLength = size
-	resp, err := c.http.Do(req)
+	resp, err := c.hook.DoHTTP(&c.http, req, "signed debug log upload")
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

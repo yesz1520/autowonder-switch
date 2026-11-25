@@ -14,6 +14,7 @@ import (
 )
 
 type Config struct {
+	EventHook  EventHook
 	BaseURL    string // Platform origin, optionally with a reverse proxy base path.
 	ExecutorID int64
 	Token      string
@@ -22,6 +23,7 @@ type Config struct {
 	HTTPClient *http.Client
 }
 type Client struct {
+	hook            EventHook
 	base            url.URL
 	id              int64
 	token, hostname string
@@ -47,10 +49,11 @@ func New(c Config) (*Client, error) {
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	u.Path = strings.TrimRight(u.Path, "/")
 	u.RawPath = strings.TrimRight(u.RawPath, "/")
-	return &Client{*u, c.ExecutorID, c.Token, c.Hostname, c.Capacity, h}, nil
+	return &Client{c.EventHook, *u, c.ExecutorID, c.Token, c.Hostname, c.Capacity, h}, nil
 }
 
 type Session struct {
+	hook       EventHook
 	conn       *websocket.Conn
 	executorID int64
 }
@@ -70,6 +73,11 @@ func (c *Client) Dial(ctx context.Context) (*Session, error) {
 	u.RawQuery = q.Encode()
 	conn, res, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{HTTPClient: &c.http})
 	if err != nil {
+		code := 0
+		if res != nil {
+			code = res.StatusCode
+		}
+		c.hook.emit(Event{Direction: "connection", Operation: "CONNECT", Outcome: "failed", Code: code})
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -79,9 +87,14 @@ func (c *Client) Dial(ctx context.Context) (*Session, error) {
 		return nil, errors.New("executor connection failed")
 	}
 	conn.SetReadLimit(16 << 20)
-	return &Session{conn: conn, executorID: c.id}, nil
+	c.hook.emit(Event{Direction: "connection", Operation: "CONNECT", Outcome: "ok", Code: 101})
+	return &Session{hook: c.hook, conn: conn, executorID: c.id}, nil
 }
-func (s *Session) Close() error { return s.conn.CloseNow() }
+func (s *Session) Close() error {
+	err := s.conn.CloseNow()
+	s.hook.emit(Event{Direction: "connection", Operation: "DISCONNECT", Outcome: "closed"})
+	return err
+}
 func (s *Session) Send(ctx context.Context, msg Outgoing) error {
 	data, err := Encode(msg)
 	if err != nil {
@@ -91,6 +104,7 @@ func (s *Session) Send(ctx context.Context, msg Outgoing) error {
 }
 func (s *Session) write(ctx context.Context, data []byte) error {
 	err := s.conn.Write(ctx, websocket.MessageText, data)
+	s.hook.frame("sent", data, err)
 	if err != nil {
 		return &transportError{err}
 	}
@@ -99,12 +113,22 @@ func (s *Session) write(ctx context.Context, data []byte) error {
 func (s *Session) Receive(ctx context.Context) (Incoming, error) {
 	kind, data, err := s.conn.Read(ctx)
 	if err != nil {
+		if ctx.Err() == nil {
+			code := int(websocket.CloseStatus(err))
+			if code < 0 {
+				code = 0
+			}
+			s.hook.emit(Event{Direction: "connection", Operation: "READ", Outcome: "failed", Code: code})
+		}
 		return nil, err
 	}
 	if kind != websocket.MessageText {
-		return nil, errors.New("expected WebSocket text frame")
+		err := errors.New("expected WebSocket text frame")
+		s.hook.frame("received", nil, err)
+		return nil, err
 	}
 	msg, err := decodeForExecutor(data, s.executorID)
+	s.hook.frame("received", data, err)
 	if err != nil {
 		return nil, &handlerError{err}
 	}

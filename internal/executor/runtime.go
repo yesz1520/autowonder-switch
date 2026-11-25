@@ -43,6 +43,7 @@ type runtime struct {
 	shutdown       context.CancelCauseFunc
 	nativeHooks    bool
 	codexBinary    string
+	hook           aw.EventHook
 	executorID     int64
 	upgrades       upgradeState
 	questions      map[string]*pendingQuestion
@@ -84,7 +85,7 @@ func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sour
 	}
 	owned, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	r := &runtime{shutdown: cancel, executorID: cfg.ExecutorID, base: cfg.BaseURL, sources: sources, client: c, ctx: owned, backend: b, capacity: cfg.Capacity, started: time.Now().UTC().Format(time.RFC3339Nano), tasks: map[int64]*job{}, turns: map[int64]*job{}}
+	r := &runtime{hook: cfg.EventHook, shutdown: cancel, executorID: cfg.ExecutorID, base: cfg.BaseURL, sources: sources, client: c, ctx: owned, backend: b, capacity: cfg.Capacity, started: time.Now().UTC().Format(time.RFC3339Nano), tasks: map[int64]*job{}, turns: map[int64]*job{}}
 	if b, ok := b.(interface{ Executable() string }); ok {
 		r.codexBinary = b.Executable()
 	}

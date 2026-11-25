@@ -43,7 +43,7 @@ func (r *runtime) platform(token string) harness.PlatformTool {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		c := http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-		resp, err := c.Do(req)
+		resp, err := r.hook.DoHTTP(&c, req, "api/mcp "+method)
 		if err != nil {
 			return "", err
 		}

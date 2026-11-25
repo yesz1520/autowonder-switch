@@ -38,6 +38,7 @@ func (c *Client) Run(ctx context.Context, interval time.Duration, h Handler) err
 		if !shouldReconnect(err) {
 			return err
 		}
+		c.hook.emit(Event{Direction: "connection", Operation: "RECONNECT", Outcome: "retry"})
 		if observer, ok := h.(interface{ Reconnecting() }); ok {
 			observer.Reconnecting()
 		}

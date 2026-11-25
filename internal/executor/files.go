@@ -95,7 +95,7 @@ func (r *runtime) attachments(ctx context.Context, q *aw.ConversationTurn, spec 
 		if e != nil {
 			return fmt.Errorf("invalid URL for %q", name)
 		}
-		resp, e := client.Do(req)
+		resp, e := r.hook.DoHTTP(&client, req, "signed attachment download")
 		if e != nil {
 			return fmt.Errorf("download failed for %q", name)
 		}
