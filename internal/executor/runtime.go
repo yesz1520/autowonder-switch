@@ -179,6 +179,9 @@ func (r *runtime) Connected(ctx context.Context, s *aw.Session) error {
 	if err := r.replayPauses(ctx, s); err != nil {
 		return err
 	}
+	if r.files.ConnectionState != nil {
+		r.files.ConnectionState("connected")
+	}
 	// A RETRYABLE result or a lost receipt can occur on a healthy connection.
 	r.wg.Go(func() {
 		tick := time.NewTicker(time.Minute)
@@ -199,6 +202,12 @@ func (r *runtime) Connected(ctx context.Context, s *aw.Session) error {
 	})
 	return nil
 }
+func (r *runtime) Reconnecting() {
+	if r.files.ConnectionState != nil {
+		r.files.ConnectionState("reconnecting")
+	}
+}
+
 func (r *runtime) send(m aw.Outgoing) error {
 	r.delivery.Lock()
 	defer r.delivery.Unlock()

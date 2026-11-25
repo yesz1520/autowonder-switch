@@ -23,6 +23,7 @@ import (
 type FileOptions struct {
 	MemoryMode, MemoryRevision       string
 	ReportedVersion, VersionRevision string
+	ConnectionState                  func(string)
 	NativePlugins                    bool
 	RestartEnabled                   bool
 	AttachmentOrigins                []string

@@ -38,6 +38,9 @@ func (c *Client) Run(ctx context.Context, interval time.Duration, h Handler) err
 		if !shouldReconnect(err) {
 			return err
 		}
+		if observer, ok := h.(interface{ Reconnecting() }); ok {
+			observer.Reconnecting()
+		}
 		if time.Since(started) >= time.Minute {
 			backoff = time.Second
 		}
