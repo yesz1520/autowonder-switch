@@ -42,6 +42,21 @@ def links(path, line):
         yield ("link", target, parts.query, parts.fragment)
 
 
+# A list item or quotation can continue without a marker up to a blank line.
+# Only check plain prose; leave block markup to the Markdown renderer.
+NESTED_BLOCK = re.compile(r"^(?: {4}|\t| {0,3}(?:>|[-+*]\s|\d+[.)]\s|<|\||\[[^]]+\]:))")
+BLOCK_BREAK = re.compile(r"^ {0,3}(?:#{1,6}(?:\s|$)|[-=*_]{3,}\s*$)")
+
+
+def check_paragraph(path, block):
+    if len(block) < 2 or any(NESTED_BLOCK.match(line) for _, line in block):
+        return
+    if any("|" in line and re.fullmatch(r"[ |:\t-]+", line) for _, line in block):
+        return  # Markdown tables can omit the outer pipes.
+    raise ValueError(f"{path.name}:{block[1][0]}: join the wrapped prose lines "
+                     "or separate paragraphs with a blank line")
+
+
 def signature(path, switch):
     lines = path.read_text(encoding="utf-8").splitlines()
     if len(lines) < 3 or not lines[0].startswith("# ") or lines[1:3] != ["", switch]:
@@ -49,6 +64,7 @@ def signature(path, switch):
     shape = []
     content = []
     fence = ""
+    paragraph = []
     for number, line in enumerate(lines[3:], 4):
         if fence:
             if re.fullmatch(r" {0,3}" + fence + fence[0] + r"*\s*", line):
@@ -63,9 +79,19 @@ def signature(path, switch):
             else:
                 content.append(line)
         elif opening := re.fullmatch(r" {0,3}(`{3,}|~{3,})(.*)", line):
+            check_paragraph(path, paragraph)
+            paragraph.clear()
             fence, language = opening[1], opening[2].strip()
             content = []
         else:
+            if not line.strip() or BLOCK_BREAK.match(line):
+                check_paragraph(path, paragraph)
+                paragraph.clear()
+            elif NESTED_BLOCK.match(line) and not any(NESTED_BLOCK.match(text) for _, text in paragraph):
+                check_paragraph(path, paragraph)
+                paragraph = [(number, line)]
+            else:
+                paragraph.append((number, line))
             shape.extend(links(path, line))
             if heading := re.match(r"^(#{1,6}) ", line):
                 shape.append(("heading", len(heading[1])))
@@ -75,6 +101,7 @@ def signature(path, switch):
                 shape.append(("table", len(re.findall(r"(?<!\\)\|", line))))
     if fence:
         raise ValueError(f"{path.name}: unclosed code fence")
+    check_paragraph(path, paragraph)
     return shape
 
 

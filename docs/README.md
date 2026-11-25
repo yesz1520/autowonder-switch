@@ -26,6 +26,8 @@ For example, “Use `--record` to ensure the translations agree” suggests the 
 
 Use phrasing familiar to developers in the target language. Split or reorder sentences as needed, while preserving fields, commands, the object of each action and the order of operations. In the example, “after reviewing” tells the reader when to run the command. Keep that condition in the translation.
 
+Write each prose paragraph on one source line and enable soft wrapping in your editor. Start a new paragraph with a blank line when the subject changes. Lists, quotations, tables and code blocks keep their own layout. The checker points out hard-wrapped prose. During review, read for natural phrasing and remove explanations the reader has already seen.
+
 <a id="review"></a>
 
 ## Review and record
