@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,6 +108,33 @@ func TestIndependentWorkersAndRestart(t *testing.T) {
 	st, err := os.Stat(filepath.Join(dir, "executors.json"))
 	if err != nil || st.Mode().Perm() != 0600 {
 		t.Fatal("config permissions")
+	}
+}
+
+func TestLocalManagementOrigin(t *testing.T) {
+	m, err := Open(t.Context(), t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := m.handler(8787)
+	for _, tc := range []struct {
+		host, origin, header string
+		want                 int
+	}{
+		{"localhost:8787", "http://unrelated.test", "local", 403},
+		{"rebind.test:8787", "http://rebind.test:8787", "local", 403},
+		{"localhost:8787", "http://localhost:8787", "", 403},
+		{"localhost:8787", "http://localhost:8787", "local", 200},
+	} {
+		r := httptest.NewRequest("POST", "http://"+tc.host+"/api/executors", strings.NewReader(`{"name":"one","url":"http://example.test","executorId":"9007199254740993","capacity":1,"token":"test","enabled":false}`))
+		r.Header.Set("Origin", tc.origin)
+		r.Header.Set("X-Switch-Request", tc.header)
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.want {
+			t.Errorf("got %d, want %d", w.Code, tc.want)
+		}
 	}
 }
 

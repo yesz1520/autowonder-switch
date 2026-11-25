@@ -18,11 +18,14 @@ import (
 	"time"
 
 	aw "github.com/yesz1520/autowonder-switch/internal/autowonder"
+	"github.com/yesz1520/autowonder-switch/internal/daemon"
 	"github.com/yesz1520/autowonder-switch/internal/executor"
+	"github.com/yesz1520/autowonder-switch/internal/harness"
 	"github.com/yesz1520/autowonder-switch/internal/harness/codex"
 )
 
 func main() {
+	admin := flag.String("listen", "127.0.0.1:8787", "local maintenance page address (multi-executor mode)")
 	base := flag.String("url", "", "AutoWonder HTTP(S) base URL")
 	id := flag.Int64("executor-id", 0, "registered executor ID")
 	cap := flag.Int("capacity", 1, "maximum concurrent tasks and conversation turns")
@@ -102,6 +105,53 @@ func main() {
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Fatal(err)
+	}
+	if *base == "" && *id == 0 {
+		if opts.MemoryMode != "" {
+			log.Fatal("set memory mode per executor in the maintenance page")
+		}
+		backends := map[string]harness.Backend{daemon.CodexHarness: backend}
+		defaults := func(ctx context.Context, field string) (string, error) {
+			switch field {
+			case "hostname":
+				return os.Hostname()
+			case "reportedVersion":
+				probe, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				v, err := backend.Version(probe)
+				if err != nil {
+					return "", err
+				}
+				return executor.DefaultCodexVersion(v), nil
+			default:
+				return "", errors.New("unknown field")
+			}
+		}
+		err = daemon.Serve(ctx, *admin, *state, defaults, func(ctx context.Context, p daemon.Profile, status func(string)) error {
+			options := opts
+			options.ConnectionState = status
+			options.MemoryMode, options.MemoryRevision = p.MemoryMode, p.MemoryRevision
+			options.ReportedVersion, options.VersionRevision = p.ReportedVersion, p.VersionRevision
+			reportedHost := p.Hostname
+			if reportedHost == "" {
+				var err error
+				reportedHost, err = os.Hostname()
+				if err != nil {
+					return err
+				}
+			}
+
+			cfg := aw.Config{BaseURL: p.PlatformBaseURL(), ExecutorID: p.ID, Token: p.Token, Capacity: p.Capacity, Hostname: reportedHost}
+			selected, ok := backends[p.Harness]
+			if !ok {
+				return fmt.Errorf("unknown harness %q", p.Harness)
+			}
+			return executor.Run(ctx, cfg, *state, selected, repos, options)
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
 	}
 	cfg := aw.Config{BaseURL: *base, ExecutorID: *id, Token: os.Getenv("AUTOWONDER_TOKEN"), Capacity: *cap, Hostname: hostname}
 	if err = executor.Run(ctx, cfg, *state, backend, repos, opts); err != nil && ctx.Err() == nil {
