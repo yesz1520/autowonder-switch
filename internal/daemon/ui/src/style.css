@@ -277,6 +277,7 @@ legend {
   display: block;
   margin-block: 4px;
 }
+.field textarea,
 .field select,
 .field input {
   width: 100%;
@@ -791,4 +792,11 @@ h2 {
   align-self: stretch;
   padding-inline: 10px;
   color: var(--text-secondary);
+}
+
+.field textarea {
+  display: block;
+  resize: vertical;
+  font-family: var(--mono);
+  margin-bottom: 8px;
 }

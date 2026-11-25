@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import CommandImport from "./CommandImport.vue";
 import Field from "./Field.vue";
 import {
   ArrowLeft,
@@ -269,6 +270,13 @@ async function change(data, key, method, message) {
     busy.value = false;
   }
 }
+function loadCommand({ fields, skipped }) {
+  Object.assign(draft.value, fields);
+  error.value = "";
+  notice.value = skipped.length
+    ? "已填入配置。已跳过当前不支持的参数：" + skipped.map(key => "--" + key).join("、")
+    : "已填入配置。";
+}
 function save() {
   const key = draft.value.key;
   const data = { ...draft.value };
@@ -533,12 +541,16 @@ function remove(p) {
                 /><label for="enable">保存后立即连接</label>
               </div>
             </fieldset>
-            <div class="actions">
-              <button class="primary" :disabled="busy || Object.values(resetting).some(Boolean)" type="submit">
-                保存配置
-              </button>
-              <button :disabled="busy" type="button" @click="select(selected)">取消</button>
-            </div>
+            <CommandImport :normalizeURL="executorURL" :disabled="busy" @load="loadCommand">
+              <template #before>
+                <button class="primary" :disabled="busy || Object.values(resetting).some(Boolean)" type="submit">
+                  保存配置
+                </button>
+              </template>
+              <template #after>
+                <button :disabled="busy" type="button" @click="select(selected)">取消</button>
+              </template>
+            </CommandImport>
           </form>
         </template>
         <template v-else-if="current">
