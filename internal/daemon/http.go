@@ -62,6 +62,7 @@ func Serve(ctx context.Context, addr, dir string, defaults func(context.Context,
 
 func (m *Manager) handler(port int) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/executors/{key}/events", m.eventsHTTP)
 	mux.HandleFunc("GET /api/executors", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(m.list())

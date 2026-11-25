@@ -24,6 +24,7 @@ import (
 const CodexHarness = "codex"
 
 type Profile struct {
+	EventHook       aw.EventHook `json:"-"`
 	platformBase    string
 	MemoryMode      string `json:"memoryMode"`
 	MemoryRevision  string `json:"memoryRevision,omitempty"`
@@ -121,14 +122,15 @@ func (w *worker) set(s string) { w.mu.Lock(); defer w.mu.Unlock(); w.status = s 
 func (w *worker) get() string  { w.mu.Lock(); defer w.mu.Unlock(); return w.status }
 
 type Manager struct {
-	mu       sync.Mutex
-	ctx      context.Context
-	file     string
-	profiles []Profile
-	workers  map[string]*worker
-	defaults func(context.Context, string) (string, error)
-	run      Run
-	closed   bool
+	journalMu sync.Mutex
+	mu        sync.Mutex
+	ctx       context.Context
+	file      string
+	profiles  []Profile
+	workers   map[string]*worker
+	defaults  func(context.Context, string) (string, error)
+	run       Run
+	closed    bool
 }
 
 func Open(ctx context.Context, dir string, run Run) (*Manager, error) {
@@ -168,6 +170,7 @@ func (m *Manager) start(p Profile) {
 	ctx, cancel := context.WithCancel(m.ctx)
 	w := &worker{cancel: cancel, done: make(chan struct{}), status: "connecting"}
 	m.workers[p.Key] = w
+	p.EventHook = func(e aw.Event) { m.recordEvent(p, e) }
 	go func() {
 		defer close(w.done)
 		for ctx.Err() == nil {

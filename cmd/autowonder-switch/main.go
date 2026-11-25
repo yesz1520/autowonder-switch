@@ -141,7 +141,7 @@ func main() {
 				}
 			}
 
-			cfg := aw.Config{BaseURL: p.PlatformBaseURL(), ExecutorID: p.ID, Token: p.Token, Capacity: p.Capacity, Hostname: reportedHost}
+			cfg := aw.Config{EventHook: p.EventHook, BaseURL: p.PlatformBaseURL(), ExecutorID: p.ID, Token: p.Token, Capacity: p.Capacity, Hostname: reportedHost}
 			selected, ok := backends[p.Harness]
 			if !ok {
 				return fmt.Errorf("unknown harness %q", p.Harness)
