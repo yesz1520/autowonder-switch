@@ -63,7 +63,14 @@ func (r *runtime) openPackageCapabilities(pkg string, spec *harness.Request) (fu
 	}
 	seen := map[string]bool{}
 	for _, p := range doc.Plugins {
-		if !slices.Contains(p.Providers, "codex") {
+		if !slices.Contains(p.Providers, r.provider()) {
+			continue
+		}
+		if r.provider() != "codex" {
+			if p.Required == nil || *p.Required {
+				cleanup()
+				return nil, fmt.Errorf("required %s package plugin unsupported: %s", r.provider(), p.Name)
+			}
 			continue
 		}
 		if !pluginName.MatchString(p.Name) || p.Path != "capabilities/plugins/"+p.Name || seen[strings.ToLower(p.Name)] {

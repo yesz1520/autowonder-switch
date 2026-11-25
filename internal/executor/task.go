@@ -180,12 +180,12 @@ func (r *runtime) execute(j *job, q *aw.TaskDispatch, dir string, result *aw.Tas
 	if q.ResumeFromDispatchID != 0 {
 		prior := filepath.Join(r.dir, fmt.Sprintf("task-%d", q.ResumeFromDispatchID), "session")
 		b, err := os.ReadFile(prior)
-		native := err == nil && q.ResumeProvider == "codex" && q.ResumeSessionID != "" && string(b) == q.ResumeSessionID
+		native := err == nil && q.ResumeProvider == r.provider() && q.ResumeSessionID != "" && string(b) == q.ResumeSessionID
 		if native {
 			spec.Session = string(b)
 			spec.Fork = q.ResumeSessionBehavior == "FORK"
 		} else if q.ResumeSessionBehavior == "FORK" {
-			return errors.New("requested source Codex session unavailable")
+			return errors.New("requested source harness session unavailable")
 		}
 		if len(repos) > 0 || !native || q.ResumeCheckpointURL != "" || q.ResumeCheckpointSHA256 != "" || q.ResumeCheckpointSeq > 0 || len(q.ResumeCheckpointCandidates) > 0 {
 			priorText, err := r.restore(j.ctx, q, dir, repos)
@@ -216,7 +216,7 @@ func (r *runtime) execute(j *job, q *aw.TaskDispatch, dir string, result *aw.Tas
 		return err
 	}
 	j.debug.event("model.started", int64(len(repos)))
-	r.report(&aw.TaskProgress{DispatchID: q.DispatchID, EventType: "llm.started", Message: "Codex started"})
+	r.report(&aw.TaskProgress{DispatchID: q.DispatchID, EventType: "llm.started", Message: r.provider() + " started"})
 	reply, err := r.runWorkflow(modelCtx, q, file, spec, harness.Hooks{TurnStarted: recordNativeTurn(filepath.Join(dir, "native-turn.json")), Session: func(native string) error {
 		if err := writeFile(filepath.Join(dir, "session"), []byte(native)); err != nil {
 			return err
@@ -277,7 +277,7 @@ func (r *runtime) finishTask(j *job, q *aw.TaskDispatch, dir string, reply harne
 	}
 	prepared.PackageID = q.PackageID
 	prepared.Checksum = q.Checksum
-	snapshot, err := repoCheckpoint(j.ctx, q.DispatchID, q.Attempt, result.ResultID, reply.Session, prepared.Summary, repos)
+	snapshot, err := repoCheckpoint(j.ctx, r.provider(), q.DispatchID, q.Attempt, result.ResultID, reply.Session, prepared.Summary, repos)
 	if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (r *runtime) deliver(ctx context.Context, q *aw.TaskDispatch, dir string, d
 	if err != nil {
 		return err
 	}
-	ck, err := r.client.UploadCheckpoint(ctx, q.DispatchID, aw.CheckpointUpload{Seq: 1, Purpose: "COMPLETION", ResultID: result.ResultID, Provider: "codex", ProviderSessionID: d.Session, File: aw.UploadFile{Name: "checkpoint.tar.gz", Reader: bytes.NewReader(data)}})
+	ck, err := r.client.UploadCheckpoint(ctx, q.DispatchID, aw.CheckpointUpload{Seq: 1, Purpose: "COMPLETION", ResultID: result.ResultID, Provider: r.provider(), ProviderSessionID: d.Session, File: aw.UploadFile{Name: "checkpoint.tar.gz", Reader: bytes.NewReader(data)}})
 	if err != nil {
 		return err
 	}

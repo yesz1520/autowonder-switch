@@ -27,7 +27,7 @@ type checkpointMeta struct {
 	Repos    []revision `json:"repos,omitempty"`
 }
 
-func repoCheckpoint(ctx context.Context, id, attempt int64, result, session, answer string, repos []checkout) ([]byte, error) {
+func repoCheckpoint(ctx context.Context, provider string, id, attempt int64, result, session, answer string, repos []checkout) ([]byte, error) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
@@ -44,7 +44,7 @@ func repoCheckpoint(ctx context.Context, id, attempt int64, result, session, ans
 		_, err := tw.Write(data)
 		return err
 	}
-	meta := checkpointMeta{"autowonder.runtimeCheckpoint.v1", id, attempt, result, "codex", session, "result.md", nil}
+	meta := checkpointMeta{"autowonder.runtimeCheckpoint.v1", id, attempt, result, provider, session, "result.md", nil}
 	for _, c := range repos {
 		meta.Repos = append(meta.Repos, c.revision())
 	}

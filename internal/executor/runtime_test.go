@@ -21,6 +21,7 @@ import (
 	"github.com/coder/websocket"
 	aw "github.com/yesz1520/autowonder-switch/internal/autowonder"
 	"github.com/yesz1520/autowonder-switch/internal/harness"
+	"github.com/yesz1520/autowonder-switch/internal/harness/claude"
 	"github.com/yesz1520/autowonder-switch/internal/harness/codex"
 )
 
@@ -93,8 +94,12 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 	var backend harness.Backend = b
 	reader := &completedTurn{}
 	savedID := aw.NewResultID()
+	useClaude := !recovery && os.Getenv("AUTOWONDER_TEST_CLAUDE") == "1"
 	if recovery {
 		backend = reader
+	} else if useClaude {
+		claudeFixture(t)
+		backend = claude.Backend{}
 	} else if os.Getenv("AUTOWONDER_TEST_CODEX") == "1" {
 		backend = codex.Backend{Binary: "codex"}
 	}
@@ -113,6 +118,19 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		<-ctx.Done()
 		c.CloseNow()
 	})
+	var usageCalls atomic.Int32
+	mux.HandleFunc("/api/daemon/tasks/1/usage", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Usage []aw.UsageEntry }
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.Usage) == 0 {
+			t.Error("missing usage")
+			return
+		}
+		if useClaude && (req.Usage[0].Provider != "claude" || req.Usage[0].InputTokens == nil || *req.Usage[0].InputTokens < 1) {
+			t.Error("incorrect Claude usage")
+		}
+		usageCalls.Add(1)
+		w.WriteHeader(204)
+	})
 	mux.HandleFunc("/package", func(w http.ResponseWriter, r *http.Request) { w.Write(data) })
 	mux.HandleFunc("/api/daemon/dispatches/1/artifacts", func(w http.ResponseWriter, r *http.Request) {
 		file, _, err := r.FormFile("files")
@@ -128,6 +146,9 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		fmt.Fprint(w, `{"files":[{"index":0,"status":"ACCEPTED"}]}`)
 	})
 	mux.HandleFunc("/api/daemon/dispatches/1/checkpoint", func(w http.ResponseWriter, r *http.Request) {
+		if useClaude && r.FormValue("provider") != "claude" {
+			t.Error("incorrect checkpoint provider")
+		}
 		f, _, err := r.FormFile("checkpoint")
 		if err != nil {
 			t.Error(err)
@@ -193,7 +214,11 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		}
 	}
 	h := read("HEARTBEAT")
-	if !bytes.Contains(h, []byte("aws-codex-")) {
+	provider := "codex"
+	if useClaude {
+		provider = "claude"
+	}
+	if !bytes.Contains(h, []byte("aws-"+provider+"-")) {
 		t.Fatal(string(h))
 	}
 	dispatch := map[string]any{"type": "TASK_DISPATCH", "executorId": 7, "dispatchId": 1, "workitemId": 23, "attempt": 1, "packageId": "p", "downloadUrl": server.URL + "/package", "checksumAlgorithm": "sha256", "checksumScope": "zip_archive", "checksum": fmt.Sprintf("sha256:%x", sha256.Sum256(data))}
@@ -231,6 +256,20 @@ func runDispatchRoundTrip(t *testing.T, recovery bool) {
 		t.Fatal("duplicate execution")
 	}
 	send(map[string]any{"type": "TASK_RESULT_ACK", "dispatchId": 1, "resultId": result.ResultID, "resultProtocolVersion": 2, "accepted": true, "disposition": "ACCEPTED"})
+	if useClaude {
+		if usageCalls.Load() != 1 {
+			t.Fatal("expected one usage report")
+		}
+		var session string
+		for i, prompt := range []string{"first-turn-marker", "confirm-prior-turn"} {
+			send(map[string]any{"type": "CONVERSATION_TURN", "executorId": 7, "conversationId": 13, "turnId": i + 1, "dispatchAttempt": 1, "content": prompt, "cliSessionRef": session})
+			var ack aw.ConversationTurnAck
+			if err := json.Unmarshal(read("CONVERSATION_TURN_ACK"), &ack); err != nil || ack.Status != "SUCCESS" || ack.SessionID == "" || (i == 1 && (ack.SessionID != session || ack.ReplyMarkdown != "preserved-history")) {
+				t.Fatalf("conversation %d: %+v %v", i, ack, err)
+			}
+			session = ack.SessionID
+		}
+	}
 	cancel()
 	select {
 	case <-done:

@@ -97,7 +97,7 @@ func (r *runtime) pause(ctx context.Context, s *aw.Session, q *aw.TaskPause) err
 			return
 		}
 		if j.terminal || j.native == "" || !j.portable {
-			r.report(&aw.TaskPauseFailed{DispatchID: q.DispatchID, Error: "no active portable Codex checkpoint"})
+			r.report(&aw.TaskPauseFailed{DispatchID: q.DispatchID, Error: "no active portable checkpoint"})
 			return
 		}
 		if j.stopModel != nil {
@@ -114,7 +114,7 @@ func (r *runtime) pause(ctx context.Context, s *aw.Session, q *aw.TaskPause) err
 		if latest == "" {
 			latest = "The preceding turn was paused before its first message. Continue from the work item."
 		}
-		data, err := repoCheckpoint(j.ctx, q.DispatchID, j.attempt, "", j.native, latest, j.repos)
+		data, err := repoCheckpoint(j.ctx, r.provider(), q.DispatchID, j.attempt, "", j.native, latest, j.repos)
 		if err == nil {
 			err = writeFile(filepath.Join(r.dir, fmt.Sprintf("task-%d", q.DispatchID), "recovery.tar.gz"), data)
 		}
@@ -123,7 +123,7 @@ func (r *runtime) pause(ctx context.Context, s *aw.Session, q *aw.TaskPause) err
 			upload, stop := context.WithTimeout(j.ctx, 30*time.Second)
 			defer stop()
 			for attempt := 0; attempt < 3; attempt++ {
-				ck, err = r.client.UploadCheckpoint(upload, q.DispatchID, aw.CheckpointUpload{Seq: 1, Purpose: "RECOVERY", Provider: "codex", ProviderSessionID: j.native, File: aw.UploadFile{Name: "checkpoint.tar.gz", Reader: bytes.NewReader(data)}})
+				ck, err = r.client.UploadCheckpoint(upload, q.DispatchID, aw.CheckpointUpload{Seq: 1, Purpose: "RECOVERY", Provider: r.provider(), ProviderSessionID: j.native, File: aw.UploadFile{Name: "checkpoint.tar.gz", Reader: bytes.NewReader(data)}})
 				var status *aw.HTTPError
 				if err == nil || upload.Err() != nil || !errors.As(err, &status) || (status.StatusCode < 500 && status.StatusCode != 429 && status.StatusCode != 408) {
 					break

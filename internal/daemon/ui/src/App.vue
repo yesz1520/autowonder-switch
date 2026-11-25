@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, watch, ref } from "vue";
 import EventHistory from "./EventHistory.vue";
 import CommandImport from "./CommandImport.vue";
 import Field from "./Field.vue";
@@ -40,7 +40,7 @@ onMounted(() => {
   narrow.addEventListener("change", resizeNav);
 });
 onUnmounted(() => narrow.removeEventListener("change", resizeNav));
-const harnessOptions = [{ value: "codex", label: "Codex" }];
+const harnessOptions = [{ value: "codex", label: "Codex" }, {value: "claude", label: "Claude Code"}];
 const memoryModes = { platform: "平台记忆", "provider-local": "本机 Agent 记忆", none: "关闭记忆" };
 const harnessLabel = (value) =>
   harnessOptions.find((option) => option.value === value)?.label ?? value;
@@ -172,37 +172,46 @@ const reportFields = [
 const localDefaults = ref({});
 const resetting = ref({});
 const defaultsFailed = ref({});
+const activeHarness = computed(() => (editing.value ? draft.value : current.value)?.harness || "codex");
+watch(activeHarness, () => {
+  const target = draft.value;
+  if (editing.value && target.restored?.reportedVersion === target.reportedVersion) target.reportedVersion = "";
+  readDefault("reportedVersion");
+});
 function displayedDefault(key) {
+  const cacheKey = key === "reportedVersion" ? key + activeHarness.value : key;
   return (
-    localDefaults.value[key] ||
-    (defaultsFailed.value[key] ? "读取失败" : "读取中…")
+    localDefaults.value[cacheKey] ||
+    (defaultsFailed.value[cacheKey] ? "读取失败" : "读取中…")
   );
 }
 onMounted(() => {
   for (const { key } of reportFields) readDefault(key);
 });
 async function readDefault(key, reset = false) {
+  const name = activeHarness.value;
+  const cacheKey=key === "reportedVersion" ? key + name : key;
   const target = draft.value;
   const original = target[key];
   if (reset) resetting.value[key] = true;
   try {
-    const response = await fetch("/api/defaults/" + key);
+    const response = await fetch("/api/defaults/" + key + "?harness=" + encodeURIComponent(name));
     if (!response.ok) throw Error();
     const value = await response.json();
-    localDefaults.value[key] = value;
-    defaultsFailed.value[key] = false;
+    localDefaults.value[cacheKey] = value;
+    defaultsFailed.value[cacheKey] = false;
     if (
       (reset || !original) &&
       editing.value &&
       draft.value === target &&
-      target[key] === original
+      target[key] === original && (key !== "reportedVersion" || target.harness === name)
     ) {
       target[key] = value;
       (target.restored ??= {})[key] = value;
       if (reset && key === "reportedVersion") target.reapplyVersion = true;
     }
   } catch {
-    defaultsFailed.value[key] = true;
+    defaultsFailed.value[cacheKey] = true;
     if (reset && draft.value === target)
       error.value = "无法读取本机默认值，请检查本机配置后重试。";
   } finally {
@@ -614,7 +623,7 @@ function remove(p) {
             </div>
           </dl>
           <p v-if="current.status === 'failed'" class="alert">
-            请检查本机 Codex、平台地址和令牌，停用后可修改配置并重试。
+            请检查本机 Harness、平台地址和令牌，停用后可修改配置并重试。
           </p>
           <div class="actions">
             <button
@@ -658,7 +667,7 @@ function remove(p) {
             <div v-else-if="!items.length" class="empty">
               <span class="terminal"><Terminal /></span>
               <h3>还没有执行器</h3>
-              <p>添加第一个身份，将本机 Codex 连接到平台。</p>
+              <p>添加第一个身份，将本机 Harness 连接到平台。</p>
             </div>
             <div v-else-if="!visible.length" class="empty">
               <Search />

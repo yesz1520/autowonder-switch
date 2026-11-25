@@ -52,7 +52,7 @@ export function readConnectCommand(input, normalizeURL) {
         fields.capacity = Number(value);
         break;
       case "provider":
-        if (value === "codex") fields.harness = "codex";
+        if (value === "codex" || value === "claude") fields.harness = value;
         else skipped.add(key);
         break;
       default:

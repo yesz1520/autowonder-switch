@@ -118,7 +118,7 @@ func TestGitDeliveryAndRecovery(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(c.workDir, "untracked"), []byte("pending"), 0600)
 	os.Remove(filepath.Join(c.workDir, "README.md"))
-	raw, err := repoCheckpoint(t.Context(), 17, 1, "", "native", "paused", repos)
+	raw, err := repoCheckpoint(t.Context(), "codex", 17, 1, "", "native", "paused", repos)
 	if err != nil {
 		t.Fatal(err)
 	}

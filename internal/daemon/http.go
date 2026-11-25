@@ -19,7 +19,7 @@ import (
 //go:embed ui/dist
 var assets embed.FS
 
-func Serve(ctx context.Context, addr, dir string, defaults func(context.Context, string) (string, error), run Run) error {
+func Serve(ctx context.Context, addr, dir string, defaults func(context.Context, string, string) (string, error), run Run) error {
 	a, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil || !a.IP.IsLoopback() {
 		return errors.New("maintenance address must be loopback")
@@ -68,7 +68,7 @@ func (m *Manager) handler(port int) http.Handler {
 		json.NewEncoder(w).Encode(m.list())
 	})
 	mux.HandleFunc("GET /api/defaults/{field}", func(w http.ResponseWriter, r *http.Request) {
-		value, err := m.defaults(r.Context(), r.PathValue("field"))
+		value, err := m.defaults(r.Context(), r.PathValue("field"), r.URL.Query().Get("harness"))
 		if err != nil {
 			http.Error(w, "无法读取该字段的本机默认值", http.StatusServiceUnavailable)
 			return

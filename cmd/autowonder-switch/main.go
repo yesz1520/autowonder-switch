@@ -21,6 +21,7 @@ import (
 	"github.com/yesz1520/autowonder-switch/internal/daemon"
 	"github.com/yesz1520/autowonder-switch/internal/executor"
 	"github.com/yesz1520/autowonder-switch/internal/harness"
+	"github.com/yesz1520/autowonder-switch/internal/harness/claude"
 	"github.com/yesz1520/autowonder-switch/internal/harness/codex"
 )
 
@@ -31,7 +32,9 @@ func main() {
 	cap := flag.Int("capacity", 1, "maximum concurrent tasks and conversation turns")
 	state := flag.String("state-dir", "", "persistent executor state directory")
 	binary := flag.String("codex", "codex", "Codex executable")
-	models := flag.Bool("list-models", false, "print selectable Codex models and exit")
+	claudeBinary := flag.String("claude", "", "Claude Code executable (default: local installation)")
+	provider := flag.String("harness", "codex", "single-executor harness: codex or claude")
+	models := flag.Bool("list-models", false, "print selectable harness models and exit")
 	repos := map[string]string{}
 	flag.Func("repo", "repo name=absolute local path (repeatable)", func(s string) error {
 		name, path, ok := strings.Cut(s, "=")
@@ -65,7 +68,11 @@ func main() {
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	backend := codex.Backend{Binary: *binary}
+	backends := map[string]harness.Backend{daemon.CodexHarness: codex.Backend{Binary: *binary}, daemon.ClaudeHarness: claude.Backend{Binary: *claudeBinary, SandboxBinary: *binary}}
+	backend, ok := backends[*provider]
+	if !ok {
+		log.Fatal("unknown harness")
+	}
 	if *models {
 		probe, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -110,19 +117,25 @@ func main() {
 		if opts.MemoryMode != "" {
 			log.Fatal("set memory mode per executor in the maintenance page")
 		}
-		backends := map[string]harness.Backend{daemon.CodexHarness: backend}
-		defaults := func(ctx context.Context, field string) (string, error) {
+		defaults := func(ctx context.Context, field, name string) (string, error) {
 			switch field {
 			case "hostname":
 				return os.Hostname()
 			case "reportedVersion":
 				probe, cancel := context.WithTimeout(ctx, 5*time.Second)
 				defer cancel()
-				v, err := backend.Version(probe)
+				if name == "" {
+					name = "codex"
+				}
+				selected, ok := backends[name]
+				if !ok {
+					return "", errors.New("unknown harness")
+				}
+				v, err := selected.Version(probe)
 				if err != nil {
 					return "", err
 				}
-				return executor.DefaultCodexVersion(v), nil
+				return executor.DefaultVersion(name, v), nil
 			default:
 				return "", errors.New("unknown field")
 			}

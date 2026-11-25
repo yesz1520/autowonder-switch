@@ -200,7 +200,7 @@ func (r *runtime) runWorkflow(ctx context.Context, q *aw.TaskDispatch, pkg strin
 			if !step.GatePolicy.HumanApprovalRequired {
 				break
 			}
-			snapshot, err := repoCheckpoint(ctx, q.DispatchID, q.Attempt, "", reply.Session, reply.Text, repos)
+			snapshot, err := repoCheckpoint(ctx, r.provider(), q.DispatchID, q.Attempt, "", reply.Session, reply.Text, repos)
 			if err != nil {
 				return reply, err
 			}

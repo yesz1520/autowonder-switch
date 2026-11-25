@@ -68,7 +68,14 @@ func identityDir(dir, base string, id int64) string {
 	return filepath.Join(dir, fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s/%d", base, id)))))
 }
 
-func DefaultCodexVersion(version string) string { return "aws-codex-" + version }
+func DefaultVersion(provider, version string) string { return "aws-" + provider + "-" + version }
+
+func (r *runtime) provider() string {
+	if b, ok := r.backend.(interface{ Provider() string }); ok {
+		return b.Provider()
+	}
+	return "codex"
+}
 
 // Run owns one registered identity. Background jobs survive WebSocket reconnects.
 func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sources map[string]string, opts ...FileOptions) error {
@@ -126,7 +133,7 @@ func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sour
 	if err != nil {
 		return err
 	}
-	r.version = DefaultCodexVersion(v)
+	r.version = DefaultVersion(r.provider(), v)
 	if err := r.loadUpgrade(); err != nil {
 		return err
 	}
@@ -257,6 +264,11 @@ func (r *runtime) snapshot() aw.Heartbeat {
 			aw.FeatureActionPlanV1, aw.FeatureTaskPackageHooksV1, aw.FeatureDebugLogV1, aw.FeatureDispatchRequestsV1, aw.FeatureExecutorUpdateV1, aw.FeatureQoderModelCatalogV1, aw.FeatureTerminalSteerV1, aw.FeatureCheckpointLightweightV1,
 			aw.FeatureConversationAcpInteractionV1, aw.FeatureConversationAnswerDeliveryV1, aw.FeatureConversationTurnCancel, aw.FeatureConversationDeliveryAckV1, aw.FeatureConversationTurnEvent,
 		},
+	}
+	if r.provider() == "claude" {
+		h.ProtocolFeatures = slices.DeleteFunc(h.ProtocolFeatures, func(f aw.Feature) bool {
+			return f == aw.FeatureTerminalSteerV1 || f == aw.FeatureConversationAnswerDeliveryV1
+		})
 	}
 	if r.files.RestartEnabled {
 		h.ProtocolFeatures = append(h.ProtocolFeatures, aw.FeatureExecutorRestartV1, aw.FeatureExecutorRestartPolicyV1, aw.FeatureExecutorLaunchCommandV1)

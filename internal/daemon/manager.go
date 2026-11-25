@@ -22,6 +22,7 @@ import (
 )
 
 const CodexHarness = "codex"
+const ClaudeHarness = "claude"
 
 type Profile struct {
 	EventHook       aw.EventHook `json:"-"`
@@ -52,7 +53,7 @@ func (p *Profile) validate() error {
 	if p.Harness == "" {
 		p.Harness = CodexHarness
 	}
-	if p.Harness != CodexHarness {
+	if p.Harness != CodexHarness && p.Harness != ClaudeHarness {
 		return errors.New("不支持的本机 harness")
 	}
 	p.Hostname = strings.TrimSpace(p.Hostname)
@@ -128,7 +129,7 @@ type Manager struct {
 	file      string
 	profiles  []Profile
 	workers   map[string]*worker
-	defaults  func(context.Context, string) (string, error)
+	defaults  func(context.Context, string, string) (string, error)
 	run       Run
 	closed    bool
 }
