@@ -2,6 +2,10 @@
 
 English | [中文](README.md)
 
-autowonder-switch connects your local Codex, Claude Code, and pi installations to AutoWonder. Each daemon includes a web UI for managing executors on that machine.
+autowonder-switch lets multiple AutoWonder executor identities share your local Codex installation. Start the daemon from the repository root and open `http://127.0.0.1:8787` to add and manage connections.
+
+```sh
+go run ./cmd/autowonder-switch
+```
 
 [Run a Codex executor](docs/development/codex.md) · [AutoWonder executor protocol](docs/protocol/README.md) · [Go client integration](docs/development/protocol-client.md) · [Documentation guidelines](docs/README.md)

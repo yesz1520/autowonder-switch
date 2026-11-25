@@ -8,6 +8,23 @@
 go run ./cmd/autowonder-switch -list-models
 ```
 
+## 在本机管理多个执行器
+
+启动 daemon 后打开 `http://127.0.0.1:8787`。在「添加执行器」里填入名称、平台地址、执行器 ID、令牌和并发容量。每个身份使用各自的平台连接，共用本机 Codex 配置。停止其中一个会中断它正在处理的任务，其他身份继续运行。
+
+```sh
+go run ./cmd/autowonder-switch
+```
+
+用 `-listen` 更换本机监听端口。配置和令牌保存在状态目录的 `executors.json` 中，仅当前用户可读写。daemon 重启后会连接已启用的身份。要轮换令牌，先停用身份，编辑连接并保存，再启用。平台下发的重启只作用于目标身份。
+
+Go 二进制内嵌 Vue 3 维护页。修改前端后，在仓库根目录执行以下命令，再构建 Go 程序。
+
+```sh
+npm ci --prefix internal/daemon/ui
+npm run build --prefix internal/daemon/ui
+```
+
 ## 连接执行器
 
 在环境变量 `AUTOWONDER_TOKEN` 中设置执行器令牌。把平台地址和执行器 ID 换成自己的值。程序在前台运行，按 Ctrl+C 退出。默认并发容量为 1，技术上限为 50，派单和会话轮次共用容量。
@@ -16,7 +33,7 @@ go run ./cmd/autowonder-switch -list-models
 go run ./cmd/autowonder-switch -url https://autowonder.example -executor-id 42 -capacity 2
 ```
 
-同一台机器可以用不同的 ID 和对应令牌分别启动进程，共用本机 Codex。状态默认保存在用户配置目录下的 `autowonder-switch` 中，按平台和身份分开。可用 `-state-dir` 指定目录，用 `-codex` 指定可执行文件。在途任务可以跨 WebSocket 重连续跑，进程退出则会中断模型轮次。已保存的最终回复可在重复派单时重新发送。
+指定平台地址和 ID 时，程序按单执行器模式运行。状态默认保存在用户配置目录下的 `autowonder-switch` 中，按平台和身份分开。可用 `-state-dir` 指定目录，用 `-codex` 指定可执行文件。在途任务可以跨 WebSocket 重连续跑，进程退出则会中断模型轮次。已保存的最终回复可在重复派单时重新发送。
 
 平台下发升级目标版本时，Switch 将版本号保存在当前执行器身份下，并在后续心跳中上报。重启后仍使用该值。本机 Codex 二进制由运维单独更新。
 

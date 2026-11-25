@@ -8,6 +8,23 @@ The executor uses your local Codex configuration and login. List the available m
 go run ./cmd/autowonder-switch -list-models
 ```
 
+## Manage multiple executors on one host
+
+Start the daemon and open `http://127.0.0.1:8787`. Choose Add Executor and enter a name, platform URL, executor ID, token and capacity. Each identity has its own connection and uses the local Codex configuration. Stopping one interrupts its active tasks while the other identities keep running.
+
+```sh
+go run ./cmd/autowonder-switch
+```
+
+Use `-listen` to change the loopback port. The daemon saves the configuration and tokens in `executors.json` in the state directory with owner-only permissions. Enabled identities reconnect on startup. To rotate a token, stop the identity, edit and save the connection, then enable it again. A platform restart request restarts only its target identity.
+
+The Go binary embeds the Vue 3 maintenance page. After editing the frontend, rebuild the assets from the repository root before building the Go binary.
+
+```sh
+npm ci --prefix internal/daemon/ui
+npm run build --prefix internal/daemon/ui
+```
+
 ## Connect an executor
 
 Set the executor token in `AUTOWONDER_TOKEN`. Substitute your platform URL and executor ID below. The process runs in the foreground until you press Ctrl+C. Capacity defaults to 1 and accepts up to 50 concurrent dispatches and conversation turns combined.
@@ -16,7 +33,7 @@ Set the executor token in `AUTOWONDER_TOKEN`. Substitute your platform URL and e
 go run ./cmd/autowonder-switch -url https://autowonder.example -executor-id 42 -capacity 2
 ```
 
-Start a separate process with each ID and its corresponding token to share one local Codex installation. State defaults to `autowonder-switch` under the user configuration directory, partitioned by platform and identity. Use `-state-dir` to choose another directory and `-codex` to select an executable. Active tasks survive WebSocket reconnects. Exiting the process interrupts model turns. A repeated dispatch can receive its saved final reply.
+Supplying the platform URL and executor ID starts the single-executor mode. State defaults to `autowonder-switch` under the user configuration directory, partitioned by platform and identity. Use `-state-dir` to choose another directory and `-codex` to select an executable. Active tasks survive WebSocket reconnects. Exiting the process interrupts model turns. A repeated dispatch can receive its saved final reply.
 
 When the platform sends an upgrade target, Switch saves that version for the current executor identity and reports it in subsequent heartbeats, including after a restart. Operators update the local Codex binary separately.
 
