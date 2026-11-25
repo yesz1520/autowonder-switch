@@ -47,7 +47,7 @@ func (r *runtime) restart(ctx context.Context, s *aw.Session, q *aw.ExecutorRest
 		return result("FAILED", err.Error())
 	}
 	next := append(slices.Clone(r.restartHistory), q.RequestID)
-	if err := save(filepath.Join(r.dir, "restart-state.json"), restartState{History: next, Launch: launch}); err != nil {
+	if err := save(filepath.Join(r.dir, "restart-state.json"), restartState{LocalMemoryRevision: r.files.MemoryRevision, History: next, Launch: launch}); err != nil {
 		r.mu.Unlock()
 		return result("FAILED", err.Error())
 	}

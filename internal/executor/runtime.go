@@ -63,6 +63,12 @@ type runtime struct {
 	wg                                 sync.WaitGroup
 }
 
+func identityDir(dir, base string, id int64) string {
+	return filepath.Join(dir, fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s/%d", base, id)))))
+}
+
+func DefaultCodexVersion(version string) string { return "aws-codex-" + version }
+
 // Run owns one registered identity. Background jobs survive WebSocket reconnects.
 func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sources map[string]string, opts ...FileOptions) error {
 	if cfg.Capacity == 0 {
@@ -85,7 +91,11 @@ func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sour
 	if len(opts) > 0 {
 		r.files = opts[0]
 	}
-	r.dir = filepath.Join(dir, fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s/%d", cfg.BaseURL, cfg.ExecutorID)))))
+	if r.files.MemoryMode != "" && !ValidMemoryMode(r.files.MemoryMode) {
+		return errors.New("invalid memory mode")
+	}
+	r.launch.MemoryMode = effectiveMemoryMode(restartState{}, r.files.MemoryMode, r.files.MemoryRevision)
+	r.dir = identityDir(dir, cfg.BaseURL, cfg.ExecutorID)
 	if r.pending, err = c.OpenOutbox(r.dir); err != nil {
 		return err
 	}
@@ -115,7 +125,7 @@ func Run(ctx context.Context, cfg aw.Config, dir string, b harness.Backend, sour
 	if err != nil {
 		return err
 	}
-	r.version = "aws-codex-" + v
+	r.version = DefaultCodexVersion(v)
 	if err := r.loadUpgrade(); err != nil {
 		return err
 	}

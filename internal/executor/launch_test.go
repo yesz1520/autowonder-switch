@@ -85,3 +85,25 @@ func TestLaunchRejectsInvalidSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestMemoryModeAcrossStarts(t *testing.T) {
+	dir := t.TempDir()
+	r := runtime{dir: dir, files: FileOptions{MemoryMode: "none", MemoryRevision: "first"}}
+	check := func(want string) {
+		t.Helper()
+		if err := r.loadRestart(); err != nil {
+			t.Fatal(err)
+		}
+		if r.launch.MemoryMode != want {
+			t.Fatalf("got %q, want %q", r.launch.MemoryMode, want)
+		}
+	}
+	check("none")
+	state := restartState{LocalMemoryRevision: "first", Launch: launchConfig{MemoryMode: "provider-local"}}
+	if err := save(filepath.Join(dir, "restart-state.json"), state); err != nil {
+		t.Fatal(err)
+	}
+	check("provider-local")
+	r.files.MemoryRevision = "edited"
+	check("none")
+}

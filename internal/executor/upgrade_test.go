@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -75,4 +76,30 @@ func TestUpgradeVersionSurvivesRestart(t *testing.T) {
 	stop()
 	_, stop = start(2, "aws-codex-test")
 	stop()
+}
+
+func TestLocalVersionEditsAndPlatformUpdates(t *testing.T) {
+	dir := t.TempDir()
+	load := func(revision, version string) *runtime {
+		t.Helper()
+		r := &runtime{dir: dir, version: "aws-codex-local", files: FileOptions{VersionRevision: revision, ReportedVersion: version}}
+		if err := r.loadUpgrade(); err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	r := load("edit-1", "custom")
+	if r.version != "custom" {
+		t.Fatal(r.version)
+	}
+	r.upgrades.Version = "platform"
+	if err := save(filepath.Join(dir, "upgrades.json"), r.upgrades); err != nil {
+		t.Fatal(err)
+	}
+	if r = load("edit-1", "custom"); r.version != "platform" {
+		t.Fatal(r.version)
+	}
+	if r = load("edit-2", ""); r.version != "aws-codex-local" {
+		t.Fatal(r.version)
+	}
 }

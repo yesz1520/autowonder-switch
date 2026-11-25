@@ -39,6 +39,13 @@ func main() {
 		return nil
 	})
 	var opts executor.FileOptions
+	flag.Func("memory-mode", "single-executor memory mode: platform (default), provider-local, or none", func(mode string) error {
+		if !executor.ValidMemoryMode(mode) {
+			return fmt.Errorf("unknown memory mode %q", mode)
+		}
+		opts.MemoryMode, opts.MemoryRevision = mode, mode
+		return nil
+	})
 	opts.RestartEnabled = runtime.GOOS == "darwin" || runtime.GOOS == "linux"
 	flag.Func("attachment-origin", "trusted object storage origin for signed clarification attachments (repeatable)", func(v string) error {
 		u, e := url.Parse(v)

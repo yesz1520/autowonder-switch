@@ -15,8 +15,9 @@ import (
 
 // The launch settings and request ID must become durable in the same write.
 type restartState struct {
-	History []string
-	Launch  launchConfig
+	LocalMemoryRevision string
+	History             []string
+	Launch              launchConfig
 }
 
 type launchConfig struct {
@@ -28,6 +29,26 @@ type launchConfig struct {
 	Capacity       int    `json:"maxConcurrentDispatches"`
 	ConfigVersion  int64  `json:"configVersion"`
 	AppliedRequest string `json:"appliedRequest"`
+}
+
+func ValidMemoryMode(mode string) bool {
+	return mode == "platform" || mode == "provider-local" || mode == "none"
+}
+
+func effectiveMemoryMode(state restartState, mode, revision string) string {
+	if state.LocalMemoryRevision == revision && state.Launch.MemoryMode != "" {
+		return state.Launch.MemoryMode
+	}
+	if mode == "" {
+		return "platform"
+	}
+	return mode
+}
+
+func SavedMemoryMode(dir, base string, id int64, mode, revision string) string {
+	var state restartState
+	_, _ = cached(filepath.Join(identityDir(dir, base, id), "restart-state.json"), &state)
+	return effectiveMemoryMode(state, mode, revision)
 }
 
 func (r *runtime) loadRestart() error {
@@ -43,6 +64,7 @@ func (r *runtime) loadRestart() error {
 	}
 	r.restartHistory = state.History
 	r.launch = state.Launch
+	r.launch.MemoryMode = effectiveMemoryMode(state, r.files.MemoryMode, r.files.MemoryRevision)
 	if n := len(state.History); n > 0 {
 		r.restartID = state.History[n-1]
 	}
@@ -66,9 +88,7 @@ func parseLaunch(q *aw.ExecutorRestart, current launchConfig) (launchConfig, err
 	if next.Capacity < 1 || next.Capacity > 50 {
 		return current, errors.New("invalid launch capacity")
 	}
-	switch next.MemoryMode {
-	case "none", "provider-local", "platform":
-	default:
+	if !ValidMemoryMode(next.MemoryMode) {
 		return current, errors.New("invalid memory mode")
 	}
 	if strings.HasPrefix(next.WorkspaceRoot, "~/") {

@@ -12,13 +12,25 @@ import (
 // The version and the unsent result change together. A crash between recording
 // the version and queuing its receipt must not lose the result.
 type upgradeState struct {
-	LaunchRequest string
-	Version       string
-	Pending       string
-	Results       map[string]aw.ExecutorUpgradeResult
+	VersionRevision string
+	LaunchRequest   string
+	Version         string
+	Pending         string
+	Results         map[string]aw.ExecutorUpgradeResult
+}
+
+// RecordedVersion returns the last platform version, unless a newer local edit is waiting to apply.
+func RecordedVersion(dir, base string, id int64, revision string) string {
+	var record struct{ Version, VersionRevision string }
+	ok, err := cached(filepath.Join(identityDir(dir, base, id), "upgrades.json"), &record)
+	if !ok || err != nil || record.VersionRevision != revision {
+		return ""
+	}
+	return record.Version
 }
 
 func (r *runtime) loadUpgrade() error {
+	nativeVersion := r.version
 	ok, err := cached(filepath.Join(r.dir, "upgrades.json"), &r.upgrades)
 	if err != nil {
 		return err
@@ -40,6 +52,15 @@ func (r *runtime) loadUpgrade() error {
 			return err
 		}
 		r.version = r.upgrades.Version
+	}
+	if r.files.VersionRevision != "" && r.upgrades.VersionRevision != r.files.VersionRevision {
+		r.upgrades.VersionRevision = r.files.VersionRevision
+		r.upgrades.Version = r.files.ReportedVersion
+		r.version = nativeVersion
+		if r.upgrades.Version != "" {
+			r.version = r.upgrades.Version
+		}
+		return save(filepath.Join(r.dir, "upgrades.json"), r.upgrades)
 	}
 	return nil
 }
