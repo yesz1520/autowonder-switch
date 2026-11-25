@@ -800,3 +800,12 @@ h2 {
   font-family: var(--mono);
   margin-bottom: 8px;
 }
+
+.detail-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border-color); }
+.detail-tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding-inline: 2px; }
+.detail-tabs button[aria-selected="true"] { border-bottom-color: currentColor; }
+.event-history { overflow-x: auto; }
+.event-history table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.event-history caption { text-align: start; padding-block: 12px; color: var(--text-secondary); }
+.event-history td, .event-history th { text-align: start; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--border-color); }
+.event-history small { display: block; color: var(--text-secondary); }

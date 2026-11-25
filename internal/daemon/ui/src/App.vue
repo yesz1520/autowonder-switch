@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import EventHistory from "./EventHistory.vue";
 import CommandImport from "./CommandImport.vue";
 import Field from "./Field.vue";
 import {
@@ -146,7 +147,17 @@ async function focusTitle() {
   await nextTick();
   title.value?.focus();
 }
+const detailTab = ref("details");
+const detailTabs = {details: "连接详情", events: "执行记录"};
+function moveTab(event) {
+  const key = event.key;
+  if (!["ArrowLeft","ArrowRight","Home","End"].includes(key)) return;
+  event.preventDefault();
+  detailTab.value = key === "Home" ? "details" : key === "End" ? "events" : detailTab.value === "events" ? "details" : "events";
+  document.getElementById("tab-" + detailTab.value)?.focus();
+}
 function select(key) {
+  detailTab.value = "details";
   closeDrawer();
   selected.value = key;
   editing.value = false;
@@ -554,7 +565,14 @@ function remove(p) {
           </form>
         </template>
         <template v-else-if="current">
-          <h2>连接详情</h2>
+          <div class="detail-tabs" role="tablist" aria-label="执行器详情" @keydown="moveTab">
+            <button v-for="(label, tab) in detailTabs" :key="tab" :id="'tab-' + tab"
+              type="button" role="tab" :aria-selected="detailTab === tab" :tabindex="detailTab === tab ? 0 : -1"
+              aria-controls="detail-panel" @click="detailTab = tab">{{ label }}</button>
+          </div>
+          <section id="detail-panel" role="tabpanel" :aria-labelledby="'tab-' + detailTab" tabindex="0">
+          <EventHistory v-if="detailTab === 'events'" :key="current.key" :identity="current.key" />
+          <template v-else>
           <dl class="card">
             <div>
               <dt>连接状态</dt>
@@ -617,6 +635,8 @@ function remove(p) {
               </button></template
             >
           </div>
+          </template>
+          </section>
         </template>
         <template v-else>
           <section class="workbench" aria-label="执行器列表">
